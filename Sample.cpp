@@ -3,194 +3,183 @@
 
 #define SHOT 20
 
-// WinMain関数
-int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
-					 LPSTR lpCmdLine, int nCmdShow )
+struct Character
 {
-	int BallX , BallY , BallGraph ;
-	int Bw, Bh, Sw, Sh ;
-	int SikakuX , SikakuY , SikakuMuki , SikakuGraph ;
-	int SikakuDamageFlag , SikakuDamageCounter , SikakuDamageGraph ;
-	int ShotX[SHOT] , ShotY[SHOT] , ShotFlag[SHOT] , ShotGraph ;
-	int SikakuW , SikakuH , ShotW , ShotH ;
-	int ShotBFlag ;
-	int i ;
-	double ETamaX , ETamaY ;
-	int ETamaFlag ;
-	double ETamaSx, ETamaSy ;
-	int ETamaW , ETamaH , ETamaGraph ;
-	int ETamaCounter ;
+	int x, y, w, h, Sw, Sh;
+	int muki, graph, damageGraph, damageCounter;
+	bool damageFlag;
+};
 
+struct Bullet
+{
+	double x, y, Sx, Sy;
+	int w, h;
+	int flag, graph, counter;
+};
 
-	// 画面モードの設定
-	SetGraphMode( 640 , 480 , 16 ) ;
+void mainExec() {
 
-	// ＤＸライブラリ初期化処理
-	if( DxLib_Init() == -1 ) return -1;
-
-	// グラフィックの描画先を裏画面にセット
-	SetDrawScreen( DX_SCREEN_BACK ) ;
+	int ShotGraph, ShotBFlag;
+	int ShotX[SHOT], ShotY[SHOT], ShotFlag[SHOT];
 
 	// ボール君のグラフィックをメモリにロード＆表示座標をセット
-	BallGraph = LoadGraph( "Ball.png" ) ;
-	BallX = 288 ; BallY = 400 ;
+	Character Ball;
+	Ball.x = 288;
+	Ball.y = 400;
+	Ball.muki = 0;
+	Ball.graph = LoadGraph("Ball.png");
+	Ball.damageGraph = 0;
+	Ball.damageFlag = FALSE;
 
 	// 四角君のグラフィックをメモリにロード＆表示座標をセット
-	SikakuGraph = LoadGraph( "Sikaku.png" ) ;
-	SikakuX = 0 ; SikakuY = 50 ;
+	Character Sikaku;
+	Sikaku.x = 0;
+	Sikaku.y = 50;
+	Sikaku.muki = 1;
+	Sikaku.graph = LoadGraph("Sikaku.png");
+	Sikaku.damageGraph = LoadGraph("SikakuDam.png");
+	Sikaku.damageFlag = FALSE;
 
-	// 四角君のダメージ時のグラフィックをメモリにロード
-	SikakuDamageGraph = LoadGraph( "SikakuDam.png" ) ;
+	Bullet Tama;
+	Tama.graph = LoadGraph("EShot.png");
+	Tama.counter = 0;
+	Tama.flag = FALSE;
 
-	// 四角君が顔を歪めているかどうかの変数に『歪めていない』を表す０を代入
-	SikakuDamageFlag = 0 ;
-
-	// 敵の弾のグラフィックをロード
-	ETamaGraph = LoadGraph( "EShot.png" ) ;
-
-	// 敵の弾のグラフィックのサイズを得る
-	GetGraphSize( ETamaGraph , &ETamaW , &ETamaH ) ;
-
-	// 敵の弾が飛んでいるかどうかを保持する変数に『飛んでいない』を表す０を代入
-	ETamaFlag = 0 ;
-
-	// 敵が弾を撃つタイミングを取るための計測用変数に０を代入
-	ETamaCounter = 0 ;
-
-	// 弾のグラフィックをメモリにロード
-	ShotGraph = LoadGraph( "Shot.png" ) ;
 
 	// 弾が画面上に存在しているか保持する変数に『存在していない』を意味する０を代入しておく
-	for( i = 0 ; i < SHOT ; i ++ )
+	for (int i = 0; i < SHOT; i++)
 	{
-		ShotFlag[i] = 0 ;
+		ShotFlag[i] = 0;
 	}
 
+	// 弾のグラフィックをメモリにロード
+	ShotGraph = LoadGraph("Shot.png");
+
 	// ショットボタンが前のフレームで押されたかどうかを保存する変数に０(押されいない)を代入
-	ShotBFlag = 0 ;
-
-	// 四角君の移動方向をセット
-	SikakuMuki = 1 ;
-
-	// 弾のグラフィックのサイズをえる
-	GetGraphSize( ShotGraph , &ShotW , &ShotH ) ;
+	ShotBFlag = 0;
 
 	// 四角君のグラフィックのサイズを得る
-	GetGraphSize( SikakuGraph , &SikakuW , &SikakuH ) ;
+	GetGraphSize(Sikaku.graph, &Sikaku.w, &Sikaku.h);
 
 	// ボール君と弾の画像のサイズを得る
-	GetGraphSize( BallGraph , &Bw , &Bh ) ;
-	GetGraphSize( ShotGraph , &Sw , &Sh ) ;
+	GetGraphSize(Ball.graph, &Ball.w, &Ball.h);
 
+	// 弾のグラフィックのサイズをえる
+	GetGraphSize(ShotGraph, &Sikaku.Sw, &Sikaku.Sh);
+
+	GetGraphSize(ShotGraph, &Ball.Sw, &Ball.Sh);
+
+	// 敵の弾のグラフィックのサイズを得る
+	GetGraphSize(Tama.graph, &Tama.w, &Tama.h);
 
 	// 移動ルーチン
-	while( 1 )
+	while (1)
 	{
 		// 画面を初期化(真っ黒にする)
-		ClearDrawScreen() ;
+		ClearDrawScreen();
 
 		// ボール君の操作ルーチン
 		{
 			// ↑キーを押していたらボール君を上に移動させる
-			if( CheckHitKey( KEY_INPUT_UP ) == 1 ) BallY -= 3 ;
+			if (CheckHitKey(KEY_INPUT_UP) == 1) Ball.y -= 3;
 
 			// ↓キーを押していたらボール君を下に移動させる
-			if( CheckHitKey( KEY_INPUT_DOWN ) == 1 ) BallY += 3 ;
+			if (CheckHitKey(KEY_INPUT_DOWN) == 1) Ball.y += 3;
 
 			// ←キーを押していたらボール君を左に移動させる
-			if( CheckHitKey( KEY_INPUT_LEFT ) == 1 ) BallX -= 3 ;
+			if (CheckHitKey(KEY_INPUT_LEFT) == 1) Ball.x -= 3;
 
 			// →キーを押していたらボール君を右に移動させる
-			if( CheckHitKey( KEY_INPUT_RIGHT ) == 1 ) BallX += 3 ;
+			if (CheckHitKey(KEY_INPUT_RIGHT) == 1) Ball.x += 3;
 
 			// スペースキーを押した場合は処理を分岐
-			if( CheckHitKey( KEY_INPUT_SPACE ) )
+			if (CheckHitKey(KEY_INPUT_SPACE))
 			{
 				// 前フレームでショットボタンを押したかが保存されている変数が０だったら弾を発射
-				if( ShotBFlag == 0 )
+				if (ShotBFlag == 0)
 				{
 					// 画面上にでていない弾があるか、弾の数だけ繰り返して調べる
-					for( i = 0 ; i < SHOT ; i ++ )
+					for (int i = 0; i < SHOT; i++)
 					{
 						// 弾iが画面上にでていない場合はその弾を画面に出す
-						if( ShotFlag[i] == 0 )
+						if (ShotFlag[i] == 0)
 						{
 							// 弾iの位置をセット、位置はボール君の中心にする
-							ShotX[i] = ( Bw - Sw ) / 2 + BallX ;
-							ShotY[i] = ( Bh - Sh ) / 2 + BallY ;
+							ShotX[i] = (Ball.w - Ball.Sw) / 2 + Ball.x;
+							ShotY[i] = (Ball.h - Ball.Sh) / 2 + Ball.y;
 
 							// 弾iは現時点を持って存在するので、存在状態を保持する変数に１を代入する
-							ShotFlag[i] = 1 ;
+							ShotFlag[i] = 1;
 
 							// 一つ弾を出したので弾を出すループから抜けます
-							break ;
+							break;
 						}
 					}
 				}
 
 				// 前フレームでショットボタンを押されていたかを保存する変数に１(おされていた)を代入
-				ShotBFlag = 1 ;
+				ShotBFlag = 1;
 			}
 			else
 			{
 				// ショットボタンが押されていなかった場合は
 				// 前フレームでショットボタンが押されていたかを保存する変数に０(おされていない)を代入
-				ShotBFlag = 0 ;
+				ShotBFlag = 0;
 			}
 
 			// ボール君が画面左端からはみ出そうになっていたら画面内の座標に戻してあげる
-			if( BallX < 0 ) BallX = 0 ;
+			if (Ball.x < 0) Ball.x = 0;
 
 			// ボール君が画面右端からはみ出そうになっていたら画面内の座標に戻してあげる
-			if( BallX > 640 - 64 ) BallX = 640 - 64  ;
+			if (Ball.x > 640 - 64) Ball.x = 640 - 64;
 
 			// ボール君が画面上端からはみ出そうになっていたら画面内の座標に戻してあげる
-			if( BallY < 0 ) BallY = 0 ;
+			if (Ball.y < 0) Ball.y = 0;
 
 			// ボール君が画面下端からはみ出そうになっていたら画面内の座標に戻してあげる
-			if( BallY > 480 - 64 ) BallY = 480 - 64 ;
+			if (Ball.y > 480 - 64) Ball.y = 480 - 64;
 
 			// ボール君を描画
-			DrawGraph( BallX , BallY , BallGraph , FALSE ) ;
+			DrawGraph(Ball.x, Ball.y, Ball.graph, FALSE);
 		}
 
 		// 弾の数だけ弾を動かす処理を繰り返す
-		for( i = 0 ; i < SHOT ; i ++ )
+		for (int i = 0; i < SHOT; i++)
 		{
 			// 自機の弾iの移動ルーチン( 存在状態を保持している変数の内容が１(存在する)の場合のみ行う )
-			if( ShotFlag[ i ] == 1 )
+			if (ShotFlag[i] == 1)
 			{
 				// 弾iを１６ドット上に移動させる
-				ShotY[ i ] -= 16 ;
+				ShotY[i] -= 16;
 
 				// 画面外に出てしまった場合は存在状態を保持している変数に０(存在しない)を代入する
-				if( ShotY[ i ] < -80 )
+				if (ShotY[i] < -80)
 				{
-					ShotFlag[ i ] = 0 ;
+					ShotFlag[i] = 0;
 				}
 
 				// 画面に弾iを描画する
-				DrawGraph( ShotX[ i ] , ShotY[ i ] , ShotGraph , FALSE ) ;
+				DrawGraph(ShotX[i], ShotY[i], ShotGraph, FALSE);
 			}
 		}
 
 		// 四角君の移動ルーチン
 		{
 			// 顔を歪めているかどうかで処理を分岐
-			if( SikakuDamageFlag == 1 )
+			if (Sikaku.damageFlag)
 			{
 				// 顔を歪めている場合はダメージ時のグラフィックを描画する
-				DrawGraph( SikakuX , SikakuY , SikakuDamageGraph , FALSE ) ;
+				DrawGraph(Sikaku.x, Sikaku.y, Sikaku.damageGraph, FALSE);
 
 				// 顔を歪めている時間を測るカウンターに１を加算する
-				SikakuDamageCounter ++ ;
+				Sikaku.damageCounter++;
 
 				// もし顔を歪め初めて ３０ フレーム経過していたら顔の歪んだ状態から
 				// 元に戻してあげる
-				if( SikakuDamageCounter == 30 )
+				if (Sikaku.damageCounter == 30)
 				{
 					// 『歪んでいない』を表す０を代入
-					SikakuDamageFlag = 0 ;
+					Sikaku.damageFlag = FALSE;
 				}
 			}
 			else
@@ -198,125 +187,144 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 				// 歪んでいない場合は今まで通りの処理
 
 				// 四角君の座標を移動している方向に移動する
-				if( SikakuMuki == 1 ) SikakuX += 3 ;
-				if( SikakuMuki == 0 ) SikakuX -= 3 ;
+				if (Sikaku.muki == 1) Sikaku.x += 3;
+				if (Sikaku.muki == 0) Sikaku.x -= 3;
 
 				// 四角君が画面右端からでそうになっていたら画面内の座標に戻してあげ、移動する方向も反転する
-				if( SikakuX > 576 )
+				if (Sikaku.x > 576)
 				{
-					SikakuX = 576 ;
-					SikakuMuki = 0 ;
+					Sikaku.x = 576;
+					Sikaku.muki = 0;
 				}
 
 				// 四角君が画面左端からでそうになっていたら画面内の座標に戻してあげ、移動する方向も反転する
-				if( SikakuX < 0 )
+				if (Sikaku.x < 0)
 				{
-					SikakuX = 0 ;
-					SikakuMuki = 1 ;
+					Sikaku.x = 0;
+					Sikaku.muki = 1;
 				}
 
 				// 四角君を描画
-				DrawGraph( SikakuX , SikakuY , SikakuGraph , FALSE ) ;
+				DrawGraph(Sikaku.x, Sikaku.y, Sikaku.graph, FALSE);
 
 				// 弾を撃つタイミングを計測するためのカウンターに１を足す
-				ETamaCounter ++ ;
+				Tama.counter++;
 
 				// もしカウンター変数が６０だった場合は弾を撃つ処理を行う
-				if( ETamaCounter == 60 )
+				if (Tama.counter == 60)
 				{
 					// もし既に弾が『飛んでいない』状態だった場合のみ発射処理を行う
-					if( ETamaFlag == 0 )
+					if (Tama.flag)
 					{
 						// 弾の発射位置を設定する
-						ETamaX = SikakuX + SikakuW / 2 - ETamaW / 2 ;
-						ETamaY = SikakuY + SikakuH / 2 - ETamaH / 2 ;
+						Tama.x = Sikaku.x + Sikaku.w / 2 - Tama.w / 2;
+						Tama.y = Sikaku.y + Sikaku.h / 2 - Tama.h / 2;
 
 						// 弾の移動速度を設定する
 						{
-							double sb, sbx, sby, bx, by, sx, sy ;
+							double sb, sbx, sby, bx, by, sx, sy;
 
-							sx = ETamaX + ETamaW / 2 ;
-							sy = ETamaY + ETamaH / 2 ;
+							sx = Tama.x + Tama.w / 2;
+							sy = Tama.y + Tama.h / 2;
 
-							bx = BallX + Bw / 2 ;
-							by = BallY + Bh / 2 ;
+							bx = Ball.x + Ball.w / 2;
+							by = Ball.y + Ball.h / 2;
 
-							sbx = bx - sx ;
-							sby = by - sy ;
+							sbx = bx - sx;
+							sby = by - sy;
 
 							// 平方根を求めるのに標準関数の sqrt を使う、
 							// これを使うには math.h をインクルードする必要がある
-							sb = sqrt( sbx * sbx + sby * sby ) ;
+							sb = sqrt(sbx * sbx + sby * sby);
 
 							// １フレーム当たり８ドット移動するようにする
-							ETamaSx = sbx / sb * 8 ;
-							ETamaSy = sby / sb * 8 ;
+							Tama.Sx = sbx / sb * 8;
+							Tama.Sy = sby / sb * 8;
 						}
 
 						// 弾の状態を保持する変数に『飛んでいる』を示す１を代入する
-						ETamaFlag = 1 ;
+						Tama.flag = TRUE;
 					}
 
 					// 弾を打つタイミングを計測するための変数に０を代入
-					ETamaCounter = 0 ;
+					Tama.counter = 0;
 				}
 			}
 		}
 
 		// 敵の弾の状態が『飛んでいる』場合のみ弾の移動処理を行う
-		if( ETamaFlag == 1 )
+		if (Tama.flag)
 		{
 			// 弾を移動させる
-			ETamaX += ETamaSx ;
-			ETamaY += ETamaSy ;
+			Tama.x += Tama.Sx;
+			Tama.y += Tama.Sy;
 
 			// もし弾が画面からはみ出てしまった場合は弾の状態を『飛んでいない』
 			// を表す０にする
-			if( ETamaY > 480 || ETamaY < 0 ||
-				ETamaX > 640 || ETamaX < 0 ) ETamaFlag = 0 ;
+			if (Tama.y > 480 || Tama.y < 0 ||
+				Tama.x > 640 || Tama.x < 0) Tama.flag = FALSE;
 
 			// 画面に描画する( ETamaGraph : 敵の弾のグラフィックのハンドル )
-			DrawGraph( ( int )ETamaX , ( int )ETamaY , ETamaGraph , FALSE ) ;
+			DrawGraph((int)Tama.x, (int)Tama.y, Tama.graph, FALSE);
 		}
 
 		// 弾と敵の当たり判定、弾の数だけ繰り返す
-		for( i = 0 ; i < SHOT ; i ++ )
+		for (int i = 0; i < SHOT; i++)
 		{
 			// 弾iが存在している場合のみ次の処理に映る
-			if( ShotFlag[ i ] == 1 )
+			if (ShotFlag[i] == 1)
 			{
 				// 四角君との当たり判定
-				if( ( ( ShotX[i] > SikakuX && ShotX[i] < SikakuX + SikakuW ) ||
-					( SikakuX > ShotX[i] && SikakuX < ShotX[i] + ShotW ) ) &&
-					( ( ShotY[i] > SikakuY && ShotY[i] < SikakuY + SikakuH ) ||
-					( SikakuY > ShotY[i] && SikakuY < ShotY[i] + ShotH ) ) )
+				if (((ShotX[i] > Sikaku.x && ShotX[i] < Sikaku.x + Sikaku.w) ||
+					(Sikaku.x > ShotX[i] && Sikaku.x < ShotX[i] + Sikaku.Sw)) &&
+					((ShotY[i] > Sikaku.y && ShotY[i] < Sikaku.y + Sikaku.h) ||
+						(Sikaku.y > ShotY[i] && Sikaku.y < ShotY[i] + Sikaku.Sh)))
 				{
 					// 接触している場合は当たった弾の存在を消す
-					ShotFlag[ i ] = 0 ;
+					ShotFlag[i] = 0;
 
 					// 四角君の顔を歪めているかどうかを保持する変数に『歪めている』を表す１を代入
-					SikakuDamageFlag = 1 ;
+					Sikaku.damageFlag = TRUE;
 
 					// 四角君の顔を歪めている時間を測るカウンタ変数に０を代入
-					SikakuDamageCounter = 0 ;
+					Sikaku.damageCounter = 0;
 				}
 			}
 		}
 
 		// 裏画面の内容を表画面にコピーする
-		ScreenFlip() ;
+		ScreenFlip();
 
 		// Windows 特有の面倒な処理をＤＸライブラリにやらせる
 		// -1 が返ってきたらループを抜ける
-		if( ProcessMessage() < 0 ) break ;
+		if (ProcessMessage() < 0) break;
 
 		// もしＥＳＣキーが押されていたらループから抜ける
-		if( CheckHitKey( KEY_INPUT_ESCAPE ) ) break ;
+		if (CheckHitKey(KEY_INPUT_ESCAPE)) break;
 	}
+}
+
+// WinMain関数
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+	LPSTR lpCmdLine, int nCmdShow)
+{
+
+	// 画面モードの設定
+	SetGraphMode(640, 480, 16);
+
+	// ＤＸライブラリ初期化処理
+	if (DxLib_Init() == -1) return -1;
+
+	// グラフィックの描画先を裏画面にセット
+	SetDrawScreen(DX_SCREEN_BACK);
+
+	mainExec();
+
 
 	// ＤＸライブラリ使用の終了処理
-	DxLib_End() ;
+	DxLib_End();
 
 	// ソフトの終了
-	return 0 ;
+	return 0;
 }
+
