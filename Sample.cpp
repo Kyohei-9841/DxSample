@@ -1,229 +1,322 @@
-//　 ここにサンプルプログラムをペーストしてください
-// 初期状態ではサウンドノベル風文字列描画サンプルが入力されています。
-// 　べつのサンプルプログラムを実行する場合は以下のプログラムをすべて
-// 削除して、新たにコピー＆ペーストしてください。
-
-// サウンドノベル風文字列描画、テキストバッファ使用バージョン
 #include "DxLib.h"
 #include <math.h>
 
-// 文字のサイズ
-#define MOJI_SIZE 24
+#define SHOT 20
 
-// 仮想テキストバッファの横サイズ縦サイズ
-#define STRBUF_WIDTH	24
-#define STRBUF_HEIGHT	20
-
-char StringBuf[ STRBUF_HEIGHT ][ STRBUF_WIDTH * 2 + 1 ] ;	// 仮想テキストバッファ
-int CursorX , CursorY ;						// 仮想画面上での文字表示カーソルの位置
-int SP , CP ;							// 参照する文字列番号と文字列中の文字ポインタ
-int EndFlag ;							// 終了フラグ
-int KeyWaitFlag ;						// ボタン押し待ちフラグ
-int Count ;							// フレームカウンタ
-
-char String[][ 256 ] =
-{
-	"　ゲームプログラムを習得するための一番の近道はとにかく沢山プログラムを組む",
-	"ことである。B" ,
-	"@　プログラムの参考書にはゲームのプログラムの方法なんて何も書かれていない、B",
-	"変数、B配列、B関数、Bループ、B条件分岐…Bこれらすべての説明はゲームで何に使うか",
-	"なんてどこにも書いていない、Bせいぜい住所録を題材にした例がある程度である。B" ,
-	"C　プログラムは習うより慣れろなのでプログラムを組むに当たって少しでも知識が",
-	"つけば後はそこからは掘り下げ、広げていけば良いわけで、Bプログラムの参考書を",
-	"読んでいて少しでも何か出来るような気がしたらそこでとにかくプログラム",
-	"を打ってみることが大事である。E",
-} ;
-
-void Kaigyou( void ) ;		// テキストバッファの改行処理関数
-
-
+// WinMain関数
 int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
-						 LPSTR lpCmdLine, int nCmdShow )
+					 LPSTR lpCmdLine, int nCmdShow )
 {
-	char OneMojiBuf[ 3 ] ;	// １文字分一時記憶配列
-	int i , j ;
+	int BallX , BallY , BallGraph ;
+	int Bw, Bh, Sw, Sh ;
+	int SikakuX , SikakuY , SikakuMuki , SikakuGraph ;
+	int SikakuDamageFlag , SikakuDamageCounter , SikakuDamageGraph ;
+	int ShotX[SHOT] , ShotY[SHOT] , ShotFlag[SHOT] , ShotGraph ;
+	int SikakuW , SikakuH , ShotW , ShotH ;
+	int ShotBFlag ;
+	int i ;
+	double ETamaX , ETamaY ;
+	int ETamaFlag ;
+	double ETamaSx, ETamaSy ;
+	int ETamaW , ETamaH , ETamaGraph ;
+	int ETamaCounter ;
 
+
+	// 画面モードの設定
 	SetGraphMode( 640 , 480 , 16 ) ;
-	if( DxLib_Init() == -1 )	// ＤＸライブラリ初期化処理
-	{
-		 return -1;				// エラーが起きたら直ちに終了
-	}
 
-	// 描画位置の初期位置セット
-	CursorX = 0 ;
-	CursorY = 0 ;
-	
-	// 参照文字位置をセット
-	SP = 0 ;	// １行目の
-	CP = 0 ;	// ０文字
+	// ＤＸライブラリ初期化処理
+	if( DxLib_Init() == -1 ) return -1;
 
-	// フォントのサイズセット
-	SetFontSize( MOJI_SIZE ) ;
-
-	// フォントの太さを変更
-	SetFontThickness( 1 ) ;
-
-	// フォントのタイプをアンチエイリアスフォントに変更
-	ChangeFontType( DX_FONTTYPE_ANTIALIASING_EDGE_8X8 ) ;
-
-	// 描画先を裏画面にセット
+	// グラフィックの描画先を裏画面にセット
 	SetDrawScreen( DX_SCREEN_BACK ) ;
 
-	// フレームカウンタ初期化
-	Count = 0 ;
+	// ボール君のグラフィックをメモリにロード＆表示座標をセット
+	BallGraph = LoadGraph( "Ball.png" ) ;
+	BallX = 288 ; BallY = 400 ;
 
-	// ループ
-	while( ProcessMessage() == 0 && CheckHitKey( KEY_INPUT_ESCAPE ) == 0 )
+	// 四角君のグラフィックをメモリにロード＆表示座標をセット
+	SikakuGraph = LoadGraph( "Sikaku.png" ) ;
+	SikakuX = 0 ; SikakuY = 50 ;
+
+	// 四角君のダメージ時のグラフィックをメモリにロード
+	SikakuDamageGraph = LoadGraph( "SikakuDam.png" ) ;
+
+	// 四角君が顔を歪めているかどうかの変数に『歪めていない』を表す０を代入
+	SikakuDamageFlag = 0 ;
+
+	// 敵の弾のグラフィックをロード
+	ETamaGraph = LoadGraph( "EShot.png" ) ;
+
+	// 敵の弾のグラフィックのサイズを得る
+	GetGraphSize( ETamaGraph , &ETamaW , &ETamaH ) ;
+
+	// 敵の弾が飛んでいるかどうかを保持する変数に『飛んでいない』を表す０を代入
+	ETamaFlag = 0 ;
+
+	// 敵が弾を撃つタイミングを取るための計測用変数に０を代入
+	ETamaCounter = 0 ;
+
+	// 弾のグラフィックをメモリにロード
+	ShotGraph = LoadGraph( "Shot.png" ) ;
+
+	// 弾が画面上に存在しているか保持する変数に『存在していない』を意味する０を代入しておく
+	for( i = 0 ; i < SHOT ; i ++ )
 	{
-		// サウンドノベル風文字列描画処理を行う
-		// ただし終了フラグが１だった場合は処理をしない
-		if( EndFlag == 0 )
-		{
-			char  Moji ;
+		ShotFlag[i] = 0 ;
+	}
 
-			// ボタン押し待ちフラグがたっていた場合はボタンが押されるまでここで終了
-			if( KeyWaitFlag == 1 )
+	// ショットボタンが前のフレームで押されたかどうかを保存する変数に０(押されいない)を代入
+	ShotBFlag = 0 ;
+
+	// 四角君の移動方向をセット
+	SikakuMuki = 1 ;
+
+	// 弾のグラフィックのサイズをえる
+	GetGraphSize( ShotGraph , &ShotW , &ShotH ) ;
+
+	// 四角君のグラフィックのサイズを得る
+	GetGraphSize( SikakuGraph , &SikakuW , &SikakuH ) ;
+
+	// ボール君と弾の画像のサイズを得る
+	GetGraphSize( BallGraph , &Bw , &Bh ) ;
+	GetGraphSize( ShotGraph , &Sw , &Sh ) ;
+
+
+	// 移動ルーチン
+	while( 1 )
+	{
+		// 画面を初期化(真っ黒にする)
+		ClearDrawScreen() ;
+
+		// ボール君の操作ルーチン
+		{
+			// ↑キーを押していたらボール君を上に移動させる
+			if( CheckHitKey( KEY_INPUT_UP ) == 1 ) BallY -= 3 ;
+
+			// ↓キーを押していたらボール君を下に移動させる
+			if( CheckHitKey( KEY_INPUT_DOWN ) == 1 ) BallY += 3 ;
+
+			// ←キーを押していたらボール君を左に移動させる
+			if( CheckHitKey( KEY_INPUT_LEFT ) == 1 ) BallX -= 3 ;
+
+			// →キーを押していたらボール君を右に移動させる
+			if( CheckHitKey( KEY_INPUT_RIGHT ) == 1 ) BallX += 3 ;
+
+			// スペースキーを押した場合は処理を分岐
+			if( CheckHitKey( KEY_INPUT_SPACE ) )
 			{
-				if( ProcessMessage() == 0 && CheckHitKeyAll() != 0 ) 
+				// 前フレームでショットボタンを押したかが保存されている変数が０だったら弾を発射
+				if( ShotBFlag == 0 )
 				{
-					// ボタンが押されていたら解除
-					KeyWaitFlag = 0 ;
+					// 画面上にでていない弾があるか、弾の数だけ繰り返して調べる
+					for( i = 0 ; i < SHOT ; i ++ )
+					{
+						// 弾iが画面上にでていない場合はその弾を画面に出す
+						if( ShotFlag[i] == 0 )
+						{
+							// 弾iの位置をセット、位置はボール君の中心にする
+							ShotX[i] = ( Bw - Sw ) / 2 + BallX ;
+							ShotY[i] = ( Bh - Sh ) / 2 + BallY ;
+
+							// 弾iは現時点を持って存在するので、存在状態を保持する変数に１を代入する
+							ShotFlag[i] = 1 ;
+
+							// 一つ弾を出したので弾を出すループから抜けます
+							break ;
+						}
+					}
+				}
+
+				// 前フレームでショットボタンを押されていたかを保存する変数に１(おされていた)を代入
+				ShotBFlag = 1 ;
+			}
+			else
+			{
+				// ショットボタンが押されていなかった場合は
+				// 前フレームでショットボタンが押されていたかを保存する変数に０(おされていない)を代入
+				ShotBFlag = 0 ;
+			}
+
+			// ボール君が画面左端からはみ出そうになっていたら画面内の座標に戻してあげる
+			if( BallX < 0 ) BallX = 0 ;
+
+			// ボール君が画面右端からはみ出そうになっていたら画面内の座標に戻してあげる
+			if( BallX > 640 - 64 ) BallX = 640 - 64  ;
+
+			// ボール君が画面上端からはみ出そうになっていたら画面内の座標に戻してあげる
+			if( BallY < 0 ) BallY = 0 ;
+
+			// ボール君が画面下端からはみ出そうになっていたら画面内の座標に戻してあげる
+			if( BallY > 480 - 64 ) BallY = 480 - 64 ;
+
+			// ボール君を描画
+			DrawGraph( BallX , BallY , BallGraph , FALSE ) ;
+		}
+
+		// 弾の数だけ弾を動かす処理を繰り返す
+		for( i = 0 ; i < SHOT ; i ++ )
+		{
+			// 自機の弾iの移動ルーチン( 存在状態を保持している変数の内容が１(存在する)の場合のみ行う )
+			if( ShotFlag[ i ] == 1 )
+			{
+				// 弾iを１６ドット上に移動させる
+				ShotY[ i ] -= 16 ;
+
+				// 画面外に出てしまった場合は存在状態を保持している変数に０(存在しない)を代入する
+				if( ShotY[ i ] < -80 )
+				{
+					ShotFlag[ i ] = 0 ;
+				}
+
+				// 画面に弾iを描画する
+				DrawGraph( ShotX[ i ] , ShotY[ i ] , ShotGraph , FALSE ) ;
+			}
+		}
+
+		// 四角君の移動ルーチン
+		{
+			// 顔を歪めているかどうかで処理を分岐
+			if( SikakuDamageFlag == 1 )
+			{
+				// 顔を歪めている場合はダメージ時のグラフィックを描画する
+				DrawGraph( SikakuX , SikakuY , SikakuDamageGraph , FALSE ) ;
+
+				// 顔を歪めている時間を測るカウンターに１を加算する
+				SikakuDamageCounter ++ ;
+
+				// もし顔を歪め初めて ３０ フレーム経過していたら顔の歪んだ状態から
+				// 元に戻してあげる
+				if( SikakuDamageCounter == 30 )
+				{
+					// 『歪んでいない』を表す０を代入
+					SikakuDamageFlag = 0 ;
 				}
 			}
 			else
 			{
-				// 文字の描画
-				Moji = String[ SP ][ CP ] ;
-				switch( Moji )
+				// 歪んでいない場合は今まで通りの処理
+
+				// 四角君の座標を移動している方向に移動する
+				if( SikakuMuki == 1 ) SikakuX += 3 ;
+				if( SikakuMuki == 0 ) SikakuX -= 3 ;
+
+				// 四角君が画面右端からでそうになっていたら画面内の座標に戻してあげ、移動する方向も反転する
+				if( SikakuX > 576 )
 				{
-				case '@' :	// 改行文字
+					SikakuX = 576 ;
+					SikakuMuki = 0 ;
+				}
 
-					// 改行処理および参照文字位置を一つ進める
-					Kaigyou() ;
-					CP ++ ;
+				// 四角君が画面左端からでそうになっていたら画面内の座標に戻してあげ、移動する方向も反転する
+				if( SikakuX < 0 )
+				{
+					SikakuX = 0 ;
+					SikakuMuki = 1 ;
+				}
 
-					break ;
+				// 四角君を描画
+				DrawGraph( SikakuX , SikakuY , SikakuGraph , FALSE ) ;
 
-				case 'B' :	// ボタン押し待ち文字
+				// 弾を撃つタイミングを計測するためのカウンターに１を足す
+				ETamaCounter ++ ;
 
-					// ボタンが離されるまで待つ
-					while( ProcessMessage() == 0 && CheckHitKeyAll() != 0 ){}
-
-					// ボタン押し待ちフラグをたてる
-					KeyWaitFlag = 1 ;
-					CP ++ ;
-
-					break ;
-
-				case 'E' :	// 終了文字
-
-					// 終了フラグを立てるおよび参照文字位置を一つ進める
-					EndFlag = 1 ;
-					CP ++ ;
-
-					break ;
-
-				case 'C' :	// クリア文字
-
-					// 仮想テキストバッファを初期化して描画文字位置を初期位置に戻すおよび参照文字位置を一つ進める
-					for( i = 0 ; i < STRBUF_HEIGHT ; i ++ )
+				// もしカウンター変数が６０だった場合は弾を撃つ処理を行う
+				if( ETamaCounter == 60 )
+				{
+					// もし既に弾が『飛んでいない』状態だった場合のみ発射処理を行う
+					if( ETamaFlag == 0 )
 					{
-						for( j = 0 ; j < STRBUF_WIDTH * 2 ; j ++ )
+						// 弾の発射位置を設定する
+						ETamaX = SikakuX + SikakuW / 2 - ETamaW / 2 ;
+						ETamaY = SikakuY + SikakuH / 2 - ETamaH / 2 ;
+
+						// 弾の移動速度を設定する
 						{
-							StringBuf[ i ][ j ] = 0 ;
+							double sb, sbx, sby, bx, by, sx, sy ;
+
+							sx = ETamaX + ETamaW / 2 ;
+							sy = ETamaY + ETamaH / 2 ;
+
+							bx = BallX + Bw / 2 ;
+							by = BallY + Bh / 2 ;
+
+							sbx = bx - sx ;
+							sby = by - sy ;
+
+							// 平方根を求めるのに標準関数の sqrt を使う、
+							// これを使うには math.h をインクルードする必要がある
+							sb = sqrt( sbx * sbx + sby * sby ) ;
+
+							// １フレーム当たり８ドット移動するようにする
+							ETamaSx = sbx / sb * 8 ;
+							ETamaSy = sby / sb * 8 ;
 						}
+
+						// 弾の状態を保持する変数に『飛んでいる』を示す１を代入する
+						ETamaFlag = 1 ;
 					}
 
-					CursorY = 0 ;
-					CursorX = 0 ;
-					CP ++ ;
-
-					break ;
-
-				default :	// その他の文字
-
-					// １文字分抜き出す
-					OneMojiBuf[ 0 ] = String[ SP ][ CP ] ;
-					OneMojiBuf[ 1 ] = String[ SP ][ CP + 1 ] ;
-					OneMojiBuf[ 2 ] = '\0' ;
-
-					// １文字テキストバッファに代入
-					StringBuf[ CursorY ][ CursorX * 2 ] = OneMojiBuf[ 0 ] ;
-					StringBuf[ CursorY ][ CursorX * 2 + 1 ] = OneMojiBuf[ 1 ] ;
-
-					// 参照文字位置を２バイト勧める
-					CP += 2 ;
-
-					// カーソルを一文字文進める
-					CursorX ++ ;
-
-					// テキストバッファ横幅からはみ出たら改行する
-					if( CursorX >= STRBUF_WIDTH ) Kaigyou() ;
-
-					break ;
-				}
-
-				// 参照文字列の終端まで行っていたら参照文字列を進める
-				if( String[ SP ][ CP ] == '\0' )
-				{
-					SP ++ ;
-					CP = 0 ;
+					// 弾を打つタイミングを計測するための変数に０を代入
+					ETamaCounter = 0 ;
 				}
 			}
 		}
 
-		// 画面のクリア
-		ClsDrawScreen() ;
-
-		// 背景エフェクトの描画
+		// 敵の弾の状態が『飛んでいる』場合のみ弾の移動処理を行う
+		if( ETamaFlag == 1 )
 		{
-			int Color ;
+			// 弾を移動させる
+			ETamaX += ETamaSx ;
+			ETamaY += ETamaSy ;
 
-			Color = ( int )( sin( Count / 100.0 ) * 80.0 + 125.0 ) ;
-			DrawBox( 0 , 0 , 640 , 480 , GetColor( Color , 0 , 0 ) , TRUE ) ;
-			Count ++ ;
+			// もし弾が画面からはみ出てしまった場合は弾の状態を『飛んでいない』
+			// を表す０にする
+			if( ETamaY > 480 || ETamaY < 0 ||
+				ETamaX > 640 || ETamaX < 0 ) ETamaFlag = 0 ;
+
+			// 画面に描画する( ETamaGraph : 敵の弾のグラフィックのハンドル )
+			DrawGraph( ( int )ETamaX , ( int )ETamaY , ETamaGraph , FALSE ) ;
 		}
 
-		// テキストバッファの描画
-		for( i = 0 ; i < STRBUF_HEIGHT ; i ++ )
+		// 弾と敵の当たり判定、弾の数だけ繰り返す
+		for( i = 0 ; i < SHOT ; i ++ )
 		{
-			DrawString( 8 , i * MOJI_SIZE , StringBuf[ i ] , GetColor( 255 , 255 , 255 ) ) ;
-		}
-
-		// 裏画面の内容を表画面に反映させる
-		ScreenFlip() ;
-	}
-
-	DxLib_End() ;				// ＤＸライブラリ使用の終了処理
-
-	return 0 ;					// ソフトの終了
-}
-
-
-
-// 改行関数
-void Kaigyou( void )
-{
-	// 描画行位置を一つ下げる
-	CursorY ++ ;
-
-	// 描画列を最初に戻す
-	CursorX = 0 ;
-
-	// もしテキストバッファ縦幅からはみ出るならテキストバッファを縦スクロールさせる
-	if( CursorY >= STRBUF_HEIGHT )
-	{
-		int i , j ;
-
-		for( i = 1 ; i < STRBUF_HEIGHT ; i ++ )
-		{
-			for( j = 0 ; j < STRBUF_WIDTH * 2 ; j ++ )
+			// 弾iが存在している場合のみ次の処理に映る
+			if( ShotFlag[ i ] == 1 )
 			{
-				StringBuf[ i - 1 ][ j ] = StringBuf[ i ][ j ] ;
+				// 四角君との当たり判定
+				if( ( ( ShotX[i] > SikakuX && ShotX[i] < SikakuX + SikakuW ) ||
+					( SikakuX > ShotX[i] && SikakuX < ShotX[i] + ShotW ) ) &&
+					( ( ShotY[i] > SikakuY && ShotY[i] < SikakuY + SikakuH ) ||
+					( SikakuY > ShotY[i] && SikakuY < ShotY[i] + ShotH ) ) )
+				{
+					// 接触している場合は当たった弾の存在を消す
+					ShotFlag[ i ] = 0 ;
+
+					// 四角君の顔を歪めているかどうかを保持する変数に『歪めている』を表す１を代入
+					SikakuDamageFlag = 1 ;
+
+					// 四角君の顔を歪めている時間を測るカウンタ変数に０を代入
+					SikakuDamageCounter = 0 ;
+				}
 			}
 		}
 
-		// 描画行位置を一つあげる
-		CursorY -- ;
+		// 裏画面の内容を表画面にコピーする
+		ScreenFlip() ;
+
+		// Windows 特有の面倒な処理をＤＸライブラリにやらせる
+		// -1 が返ってきたらループを抜ける
+		if( ProcessMessage() < 0 ) break ;
+
+		// もしＥＳＣキーが押されていたらループから抜ける
+		if( CheckHitKey( KEY_INPUT_ESCAPE ) ) break ;
 	}
+
+	// ＤＸライブラリ使用の終了処理
+	DxLib_End() ;
+
+	// ソフトの終了
+	return 0 ;
 }
