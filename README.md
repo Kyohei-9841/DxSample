@@ -1,7 +1,8 @@
 # DxSample
 
-必要なものは以下サイトからダウンロード
-ダウンロードしたものからsample.cppを削除
-git clone . でこちらの資材を落とす
+## 手順
 
-https://dxlib.xsrv.jp/dxlecture_main.html
+1、必要なものは以下サイトからダウンロード<br>
+https://dxlib.xsrv.jp/dxlecture_main.html<br>
+2、ダウンロードしたものからsample.cppを削除<br>
+3、git clone . でこちらの資材を落とす<br>
